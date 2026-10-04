@@ -29,7 +29,7 @@ export default function ProductCard({ p, currency }: { p: any; currency: string 
         </div>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <a href={`/buy/${p.slug}`} target="_blank" rel="nofollow noopener" className="flex-1 rounded-full bg-brand-600 px-3 py-2 text-center text-xs font-semibold text-white hover:bg-brand-700">Buy Now</a>
-          <Link href={`/product/${p.slug}`} className="flex-1 rounded-full border px-3 py-2 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50">Details</Link>
+          <a href={`/buy/${p.slug}`} target="_blank" rel="nofollow noopener" className="flex-1 rounded-full border px-3 py-2 text-center text-xs font-semibold text-gray-700 hover:bg-gray-50">Details</a>
         </div>
       </div>
     </div>
