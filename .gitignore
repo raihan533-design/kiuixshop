@@ -5,3 +5,6 @@ prisma/dev.db-journal
 .env
 public/uploads
 .neon
+
+# Local Netlify folder
+.netlify
