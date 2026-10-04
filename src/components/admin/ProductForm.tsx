@@ -38,7 +38,7 @@ export default function ProductForm({ product, categories }: any) {
       const res = await fetch("/api/admin/upload", { method: "POST", body: fd });
       if (res.ok) urls.push((await res.json()).url);
     }
-    set("images", [f.images, ...urls].filter(Boolean).join("\n"));
+    set("images", [...urls, ...f.images.split("\n").filter((l: string) => l.trim())].join("\n"));
   }
 
   async function submit(e: any) {
@@ -99,7 +99,7 @@ export default function ProductForm({ product, categories }: any) {
         <option value="">None</option>
         {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
       </select>
-      <label className={label}>Images (one URL per line)</label>
+      <label className={label}>Images (one URL per line) — top one shows as main</label>
       <textarea rows={3} className={input} value={f.images} onChange={(e) => set("images", e.target.value)} />
       <label className={label}>Upload images</label>
       <input type="file" multiple accept="image/*" onChange={upload} />
