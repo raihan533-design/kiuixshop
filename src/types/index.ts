@@ -59,3 +59,13 @@ export interface CustomerReview {
   verified: boolean;
   productName: string;
 }
+
+export interface HeroConfig {
+  featuredProductId?: string;
+  customImage?: string;
+  badgeText?: string;
+  headline?: string;
+  headlineHighlight?: string;
+  subtitle?: string;
+  featurePill?: string;
+}

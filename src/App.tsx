@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Currency, CartItem, Product, CategoryItem } from './types';
+import { Currency, CartItem, Product, CategoryItem, HeroConfig } from './types';
 import { PRODUCTS as INITIAL_PRODUCTS, CURRENCIES, DEFAULT_CATEGORIES } from './data/products';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -25,7 +25,9 @@ import {
   supabaseFetchProducts, 
   supabaseUpsertProduct, 
   supabaseInsertProduct, 
-  supabaseDeleteProduct 
+  supabaseDeleteProduct,
+  supabaseFetchHeroConfig,
+  supabaseSaveHeroConfig
 } from './lib/supabase';
 
 export function App() {
@@ -82,6 +84,24 @@ export function App() {
     }
     setCategories((prev) => prev.filter((c) => c.id !== catId));
   };
+
+  // Hero Section Customization State with LocalStorage persistence
+  const [heroConfig, setHeroConfig] = useState<HeroConfig>(() => {
+    try {
+      const saved = localStorage.getItem('kiuix_hero_config');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kiuix_hero_config', JSON.stringify(heroConfig));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [heroConfig]);
 
   // Admin View & Secret Lock States (Hidden from regular users)
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -199,11 +219,21 @@ export function App() {
 
     fetchLiveProducts();
 
-    // Real-time synchronization: when admin adds or changes a product, all viewers' screens update live
+    // Fetch live Hero Banner settings
+    supabaseFetchHeroConfig().then((cfg) => {
+      if (cfg) setHeroConfig(cfg);
+    });
+
+    // Real-time synchronization: when admin adds or changes a product or hero settings, all viewers' screens update live
     const channel = client
-      .channel('public:products')
+      .channel('public:changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
         fetchLiveProducts();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, () => {
+        supabaseFetchHeroConfig().then((cfg) => {
+          if (cfg) setHeroConfig(cfg);
+        });
       })
       .subscribe();
 
@@ -349,6 +379,11 @@ export function App() {
         products={products}
         categories={categories}
         currentCurrency={currentCurrency}
+        heroConfig={heroConfig}
+        onUpdateHeroConfig={(newCfg) => {
+          setHeroConfig(newCfg);
+          supabaseSaveHeroConfig(newCfg);
+        }}
         onUpdateProduct={handleUpdateProduct}
         onAddProduct={handleAddProduct}
         onDeleteProduct={handleDeleteProduct}
@@ -392,6 +427,8 @@ export function App() {
       <main className="flex-1">
         {/* Hero Section */}
         <Hero
+          products={products}
+          heroConfig={heroConfig}
           currentCurrency={currentCurrency}
           onExploreClick={() => {
             const el = document.getElementById('catalog');

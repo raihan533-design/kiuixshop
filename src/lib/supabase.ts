@@ -137,6 +137,35 @@ export async function supabaseBulkUpsert(products: Product[]) {
   return (client.from('products') as any).upsert(rows, { onConflict: 'id' });
 }
 
+// Hero banner config cloud helpers
+export async function supabaseFetchHeroConfig(): Promise<any | null> {
+  const client = getSupabaseClient();
+  if (!client) return null;
+  try {
+    const { data, error } = await (client.from('site_settings') as any).select('value').eq('key', 'hero_config').maybeSingle();
+    if (!error && data?.value) {
+      return data.value;
+    }
+  } catch (e) {
+    // ignore if table does not exist
+  }
+  return null;
+}
+
+export async function supabaseSaveHeroConfig(config: any) {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    await (client.from('site_settings') as any).upsert({
+      key: 'hero_config',
+      value: config,
+      updated_at: new Date().toISOString()
+    });
+  } catch (e) {
+    console.error('Failed to sync hero config to supabase:', e);
+  }
+}
+
 // SQL schema generator for Supabase SQL Editor
 export const SUPABASE_SQL_SCHEMA = `-- 1. Create products table
 create table if not exists public.products (
@@ -162,14 +191,13 @@ create table if not exists public.products (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 2. Enable Row Level Security (RLS)
+-- 2. Enable Row Level Security (RLS) on products
 alter table public.products enable row level security;
 
--- 3. Create public read policy (everyone in the world can read products)
+-- 3. Public access policies for products
 drop policy if exists "Allow public read" on public.products;
 create policy "Allow public read" on public.products for select using (true);
 
--- 4. Create public write policy (allow admin to create/update/delete products)
 drop policy if exists "Allow public insert" on public.products;
 create policy "Allow public insert" on public.products for insert with check (true);
 
@@ -178,4 +206,19 @@ create policy "Allow public update" on public.products for update using (true);
 
 drop policy if exists "Allow public delete" on public.products;
 create policy "Allow public delete" on public.products for delete using (true);
+
+-- 4. Create site_settings table (Hero Banner customization & Store settings)
+create table if not exists public.site_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.site_settings enable row level security;
+
+drop policy if exists "Allow public read settings" on public.site_settings;
+create policy "Allow public read settings" on public.site_settings for select using (true);
+
+drop policy if exists "Allow public write settings" on public.site_settings;
+create policy "Allow public write settings" on public.site_settings for all using (true) with check (true);
 `;

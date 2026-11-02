@@ -9,11 +9,13 @@ import {
   Star,
   CreditCard
 } from 'lucide-react';
-import { Currency } from '../types';
-import { CURRENCIES, PRODUCTS } from '../data/products';
+import { Currency, Product, HeroConfig } from '../types';
+import { CURRENCIES, PRODUCTS as DEFAULT_PRODUCTS } from '../data/products';
 
 interface HeroProps {
   currentCurrency: Currency;
+  products?: Product[];
+  heroConfig?: HeroConfig;
   onExploreClick: () => void;
   onQuickView: (productId: string) => void;
   onAddToCart: (productId: string) => void;
@@ -21,11 +23,23 @@ interface HeroProps {
 
 export const Hero: React.FC<HeroProps> = ({
   currentCurrency,
+  products = DEFAULT_PRODUCTS,
+  heroConfig,
   onExploreClick,
   onQuickView,
   onAddToCart
 }) => {
-  const heroProduct = PRODUCTS[0]; // KIUIX Pulse Pro ANC
+  // Find featured product selected by Admin, or fall back to first product in catalog
+  const heroProduct = (heroConfig?.featuredProductId
+    ? products.find((p) => p.id === heroConfig.featuredProductId)
+    : null) || products[0] || DEFAULT_PRODUCTS[0];
+
+  const heroImage = heroConfig?.customImage || heroProduct.image;
+  const heroBadge = heroConfig?.badgeText || 'NEW GENERATION 2026 LINEUP';
+  const heroHeadline = heroConfig?.headline || 'Elevate Your Everyday';
+  const heroHighlight = heroConfig?.headlineHighlight || 'Performance & Audio.';
+  const heroSubtitle = heroConfig?.subtitle || 'Precision-engineered minimalism for creators, developers, and trendsetters. Designed for everyday excellence.';
+  const heroFeaturePill = heroConfig?.featurePill || (heroProduct.features?.[0] || 'Premium Build Quality');
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-white via-slate-50/50 to-white pt-8 pb-16 lg:pt-14 lg:pb-24 border-b border-slate-100">
@@ -44,22 +58,21 @@ export const Hero: React.FC<HeroProps> = ({
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600"></span>
               </span>
-              <span>NEW GENERATION 2026 LINEUP</span>
+              <span>{heroBadge}</span>
               <span className="bg-blue-600 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">LIVE</span>
             </div>
 
             {/* Main Headline */}
             <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-950 tracking-tight leading-[1.15]">
-              Elevate Your Everyday <br className="hidden sm:inline" />
+              {heroHeadline} <br className="hidden sm:inline" />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-700 via-blue-600 to-indigo-600">
-                Performance & Audio.
+                {heroHighlight}
               </span>
             </h1>
 
             {/* Subtitle */}
             <p className="text-sm sm:text-lg text-slate-600 max-w-xl mx-auto lg:mx-0 leading-relaxed font-normal">
-              Precision-engineered minimalism for creators, developers, and audiophiles. 
-              Designed in signature white, electric blue, and obsidian black.
+              {heroSubtitle}
             </p>
 
             {/* Key Value Proposition Chips */}
@@ -114,7 +127,7 @@ export const Hero: React.FC<HeroProps> = ({
                   ))}
                   <span className="ml-1 text-slate-900 font-bold">4.9 / 5</span>
                 </div>
-                <span>Over 1,200+ satisfied tech enthusiasts worldwide</span>
+                <span>Over 1,200+ satisfied customers worldwide</span>
               </div>
             </div>
           </div>
@@ -137,7 +150,7 @@ export const Hero: React.FC<HeroProps> = ({
               {/* Product Badge */}
               <div className="flex items-center justify-between mb-3 sm:mb-4">
                 <span className="bg-blue-600 text-white text-[10px] sm:text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                  Flagship Audio
+                  {heroProduct.badge || 'FLAGSHIP SPOTLIGHT'}
                 </span>
                 <span className="text-[11px] sm:text-xs font-semibold text-slate-500 flex items-center gap-1">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -148,7 +161,7 @@ export const Hero: React.FC<HeroProps> = ({
               {/* Main Product Showcase Image */}
               <div className="relative overflow-hidden rounded-2xl bg-gradient-to-tr from-slate-100 to-slate-50 aspect-4/3 flex items-center justify-center p-3 sm:p-4">
                 <img
-                  src={heroProduct.image}
+                  src={heroImage}
                   alt={heroProduct.name}
                   className="w-full h-full object-cover rounded-xl transition-transform duration-700 group-hover:scale-105"
                 />
@@ -156,7 +169,7 @@ export const Hero: React.FC<HeroProps> = ({
                 {/* Instant overlay badge */}
                 <div className="absolute bottom-2.5 left-2.5 bg-slate-950/80 backdrop-blur-md text-white text-[10px] sm:text-[11px] font-medium px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                  40mm Beryllium Drivers
+                  {heroFeaturePill}
                 </div>
               </div>
 

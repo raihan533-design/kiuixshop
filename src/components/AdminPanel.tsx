@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Product, Currency, CategoryItem, ProductColor } from '../types';
+import { Product, Currency, CategoryItem, ProductColor, HeroConfig } from '../types';
 import { CURRENCIES, PRODUCTS as DEFAULT_PRODUCTS, DEFAULT_CATEGORIES } from '../data/products';
 import { Logo } from './Logo';
 import { 
@@ -31,15 +31,19 @@ import {
   ChevronRight,
   Sparkles,
   Link as LinkIcon,
-  Database
+  Database,
+  Star
 } from 'lucide-react';
 import { PrintdoorsModal } from './PrintdoorsModal';
 import { SupabaseModal } from './SupabaseModal';
+import { HeroSettingsModal } from './HeroSettingsModal';
 
 interface AdminPanelProps {
   products: Product[];
   categories?: CategoryItem[];
   currentCurrency: Currency;
+  heroConfig?: HeroConfig;
+  onUpdateHeroConfig?: (newConfig: HeroConfig) => void;
   onUpdateProduct: (updated: Product) => void;
   onAddProduct: (newProduct: Product) => void;
   onDeleteProduct: (id: string) => void;
@@ -56,6 +60,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
   categories = DEFAULT_CATEGORIES,
   currentCurrency,
+  heroConfig,
+  onUpdateHeroConfig,
   onUpdateProduct,
   onAddProduct,
   onDeleteProduct,
@@ -75,6 +81,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isNewProduct, setIsNewProduct] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Hero Banner Settings Modal state
+  const [isHeroModalOpen, setIsHeroModalOpen] = useState(false);
 
   // Supabase Cloud Database state
   const [isSupabaseOpen, setIsSupabaseOpen] = useState(false);
@@ -730,6 +739,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <span>Add Product</span>
               </button>
 
+              {/* Hero Banner Settings CTA */}
+              <button
+                onClick={() => setIsHeroModalOpen(true)}
+                title="Configure homepage Hero banner photo, top-seller product, and headlines"
+                className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-blue-500/25"
+              >
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>Hero Banner Settings</span>
+              </button>
+
               {/* Manage Sections / Categories CTA */}
               <button
                 onClick={() => setIsCategoryManagerOpen(true)}
@@ -898,6 +917,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-1">
                     <button
+                      onClick={() => {
+                        onUpdateHeroConfig?.({
+                          ...heroConfig,
+                          featuredProductId: p.id,
+                          customImage: undefined,
+                        });
+                        showToast(`"${p.name}" featured on Homepage Hero Banner!`);
+                      }}
+                      className={`p-2 rounded-xl border border-slate-800 transition-colors ${
+                        heroConfig?.featuredProductId === p.id
+                          ? 'bg-amber-400 text-slate-950 font-bold'
+                          : 'bg-slate-900 text-amber-400 hover:bg-slate-800'
+                      }`}
+                      title="Set as Hero Spotlight"
+                    >
+                      <Star className={`w-4 h-4 ${heroConfig?.featuredProductId === p.id ? 'fill-current' : ''}`} />
+                    </button>
+                    <button
                       onClick={() => openEditModal(p)}
                       className="flex-1 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-blue-400 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-800"
                     >
@@ -1021,6 +1058,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       {/* Action buttons */}
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => {
+                              onUpdateHeroConfig?.({
+                                ...heroConfig,
+                                featuredProductId: p.id,
+                                customImage: undefined,
+                              });
+                              showToast(`"${p.name}" is now featured on the Homepage Hero Banner!`);
+                            }}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                              heroConfig?.featuredProductId === p.id
+                                ? 'bg-amber-400 text-slate-950 font-bold'
+                                : 'bg-slate-900 hover:bg-amber-400 hover:text-slate-950 text-slate-400'
+                            }`}
+                            title="Feature this product in Homepage Hero Banner"
+                          >
+                            <Star className={`w-4 h-4 ${heroConfig?.featuredProductId === p.id ? 'fill-current' : ''}`} />
+                          </button>
                           <button
                             onClick={() => openEditModal(p)}
                             className="p-1.5 rounded-lg bg-slate-900 hover:bg-blue-600 hover:text-white text-slate-400 transition-colors cursor-pointer"
@@ -1712,6 +1767,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         onSyncProductsFromCloud={(cloudProducts) => {
           onSyncProductsFromCloud?.(cloudProducts);
           showToast(`Loaded ${cloudProducts.length} live products directly from Supabase Cloud!`);
+        }}
+      />
+
+      {/* Hero Banner Settings Modal */}
+      <HeroSettingsModal
+        isOpen={isHeroModalOpen}
+        onClose={() => setIsHeroModalOpen(false)}
+        products={products}
+        currentConfig={heroConfig}
+        onSaveConfig={(newConfig) => {
+          onUpdateHeroConfig?.(newConfig);
+          showToast('Homepage Hero Banner updated successfully!');
         }}
       />
 
