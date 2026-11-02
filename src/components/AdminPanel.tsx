@@ -30,9 +30,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Sparkles,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Database
 } from 'lucide-react';
 import { PrintdoorsModal } from './PrintdoorsModal';
+import { SupabaseModal } from './SupabaseModal';
 
 interface AdminPanelProps {
   products: Product[];
@@ -47,6 +49,7 @@ interface AdminPanelProps {
   onClose: () => void;
   onPreviewStore: () => void;
   onLockAdmin?: () => void;
+  onSyncProductsFromCloud?: (cloudProducts: Product[]) => void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({
@@ -62,6 +65,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onClose,
   onPreviewStore,
   onLockAdmin,
+  onSyncProductsFromCloud,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -71,6 +75,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isNewProduct, setIsNewProduct] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+
+  // Supabase Cloud Database state
+  const [isSupabaseOpen, setIsSupabaseOpen] = useState(false);
 
   // Form Fields
   const [formName, setFormName] = useState('');
@@ -769,6 +776,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   }}
                 />
               </label>
+
+              {/* Cloud Database (Supabase) CTA */}
+              <button
+                onClick={() => setIsSupabaseOpen(true)}
+                title="Connect Supabase Cloud Database for Worldwide Real-Time Sync"
+                className="px-3.5 py-2 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 active:scale-95 text-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-emerald-500/10"
+              >
+                <Database className="w-4 h-4 text-emerald-400" />
+                <span>Cloud DB (Supabase)</span>
+              </button>
 
               {/* Printdoors POD Integration CTA */}
               <button
@@ -1684,6 +1701,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         onImportProducts={(imported) => {
           imported.forEach((p) => onAddProduct(p));
           showToast(`Imported ${imported.length} Printdoors products!`);
+        }}
+      />
+
+      {/* Supabase Cloud Database Modal */}
+      <SupabaseModal
+        isOpen={isSupabaseOpen}
+        onClose={() => setIsSupabaseOpen(false)}
+        products={products}
+        onSyncProductsFromCloud={(cloudProducts) => {
+          onSyncProductsFromCloud?.(cloudProducts);
+          showToast(`Loaded ${cloudProducts.length} live products directly from Supabase Cloud!`);
         }}
       />
 

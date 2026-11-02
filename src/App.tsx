@@ -19,6 +19,14 @@ import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
 import { PolicyModal } from './components/PolicyModal';
 import { SlidersHorizontal, ArrowUpDown, Sparkles } from 'lucide-react';
+import { 
+  getSupabaseClient, 
+  rowToProduct, 
+  supabaseFetchProducts, 
+  supabaseUpsertProduct, 
+  supabaseInsertProduct, 
+  supabaseDeleteProduct 
+} from './lib/supabase';
 
 export function App() {
   // Products Catalog State with LocalStorage persistence
@@ -172,24 +180,73 @@ export function App() {
     }
   }, [products]);
 
-  // Product CRUD actions for Admin
-  const handleUpdateProduct = (updated: Product) => {
+  // Worldwide Cloud Database: Fetch from Supabase on load and subscribe to real-time changes
+  useEffect(() => {
+    const client = getSupabaseClient();
+    if (!client) return;
+
+    const fetchLiveProducts = async () => {
+      try {
+        const { data, error } = await supabaseFetchProducts();
+        if (!error && data && data.length > 0) {
+          const cloudProducts = data.map(rowToProduct);
+          setProducts(cloudProducts);
+        }
+      } catch (err) {
+        console.error('Supabase fetch error:', err);
+      }
+    };
+
+    fetchLiveProducts();
+
+    // Real-time synchronization: when admin adds or changes a product, all viewers' screens update live
+    const channel = client
+      .channel('public:products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        fetchLiveProducts();
+      })
+      .subscribe();
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  }, []);
+
+  // Product CRUD actions for Admin (with local & worldwide cloud persistence)
+  const handleUpdateProduct = async (updated: Product) => {
     setProducts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-    // Also update cart if product is inside
     setCart((prev) =>
       prev.map((item) =>
         item.product.id === updated.id ? { ...item, product: updated } : item
       )
     );
+
+    try {
+      await supabaseUpsertProduct(updated);
+    } catch (e) {
+      console.error('Supabase cloud update error:', e);
+    }
   };
 
-  const handleAddProduct = (newProduct: Product) => {
+  const handleAddProduct = async (newProduct: Product) => {
     setProducts((prev) => [newProduct, ...prev]);
+
+    try {
+      await supabaseInsertProduct(newProduct);
+    } catch (e) {
+      console.error('Supabase cloud insert error:', e);
+    }
   };
 
-  const handleDeleteProduct = (id: string) => {
+  const handleDeleteProduct = async (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
     setCart((prev) => prev.filter((item) => item.product.id !== id));
+
+    try {
+      await supabaseDeleteProduct(id);
+    } catch (e) {
+      console.error('Supabase cloud delete error:', e);
+    }
   };
 
   const handleResetProducts = () => {
@@ -300,6 +357,7 @@ export function App() {
         onDeleteCategory={handleDeleteCategory}
         onClose={() => setIsAdminOpen(false)}
         onPreviewStore={() => setIsAdminOpen(false)}
+        onSyncProductsFromCloud={(cloudProducts) => setProducts(cloudProducts)}
         onLockAdmin={() => {
           setIsAdminOpen(false);
           setIsAdminLockOpen(false);
