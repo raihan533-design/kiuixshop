@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/checkout
+
+Sitemap: https://kiuixshop.com/sitemap.xml
