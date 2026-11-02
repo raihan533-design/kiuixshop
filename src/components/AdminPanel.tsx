@@ -23,7 +23,9 @@ import {
   Download,
   Layers,
   FolderPlus,
-  Printer
+  Printer,
+  Upload,
+  Image as ImageIcon
 } from 'lucide-react';
 import { PrintdoorsModal } from './PrintdoorsModal';
 
@@ -97,6 +99,64 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const showToast = (msg: string) => {
     setSuccessToast(msg);
     setTimeout(() => setSuccessToast(null), 3000);
+  };
+
+  // Direct file upload from user's computer with auto-resizing & optimization
+  const handleImageFileUpload = (file: File, isSecondary: boolean = false) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Please select a valid image file (JPG, PNG, WEBP, GIF, etc.)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const rawDataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        // Optimize to max 1200px to maintain HD crispness while fitting within browser localStorage
+        const maxDim = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+          const optimized = canvas.toDataURL(mimeType, 0.88);
+          if (isSecondary) {
+            setFormSecondaryImage(optimized);
+            showToast('Secondary image uploaded from computer!');
+          } else {
+            setFormImage(optimized);
+            showToast('Main product image uploaded from computer!');
+          }
+        } else {
+          if (isSecondary) {
+            setFormSecondaryImage(rawDataUrl);
+          } else {
+            setFormImage(rawDataUrl);
+          }
+          showToast('Image uploaded from computer!');
+        }
+      };
+      img.onerror = () => {
+        alert('Could not read image file. Please try another image.');
+      };
+      img.src = rawDataUrl;
+    };
+    reader.readAsDataURL(file);
   };
 
   // Metric stats
@@ -245,7 +305,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsCreatingNewCategoryInline(true);
     }
     setInlineCatLabel('');
-    setFormImage('https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&auto=format&fit=crop&q=80');
+    setFormImage('');
     setFormSecondaryImage('');
     setFormDescription('High-end precision crafted hardware engineered for modern workflows.');
     setFormBadge('NEW');
@@ -256,6 +316,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Save changes
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formImage.trim()) {
+      alert('Please upload an image from your computer for this product before saving!');
+      return;
+    }
 
     const featuresArray = formFeatures
       .split('\n')
@@ -939,25 +1004,113 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              {/* Primary Image URL & Live Preview */}
+              {/* Product Main Image (Upload from Computer) */}
               <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">Main Image URL</label>
-                <div className="flex gap-3 items-center">
-                  <input
-                    type="url"
-                    required
-                    value={formImage}
-                    onChange={(e) => setFormImage(e.target.value)}
-                    placeholder="https://images.unsplash.com/..."
-                    className="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-hidden focus:border-blue-500"
-                  />
-                  <div className="w-12 h-12 rounded-xl bg-slate-950 border border-slate-800 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                    {formImage ? (
-                      <img src={formImage} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-[10px] text-slate-600">No img</span>
-                    )}
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-300">
+                    Product Main Image
+                  </label>
+                  {formImage && (
+                    <button
+                      type="button"
+                      onClick={() => setFormImage('')}
+                      className="text-[11px] text-rose-400 hover:text-rose-300 cursor-pointer flex items-center gap-1 font-semibold"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>Remove Photo</span>
+                    </button>
+                  )}
+                </div>
+
+                {formImage ? (
+                  <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3 flex items-center gap-4 shadow-inner">
+                    <img
+                      src={formImage}
+                      alt="Uploaded preview"
+                      className="w-20 h-20 rounded-xl object-cover bg-slate-900 border border-slate-700 shadow-md flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          <Check className="w-3 h-3" /> Image Selected
+                        </span>
+                        {formImage.startsWith('data:') && (
+                          <span className="text-[10px] text-blue-400 font-mono">From Computer</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-300 font-semibold mt-1">
+                        High resolution photo ready for catalog
+                      </p>
+                      
+                      <div className="mt-2.5 flex items-center gap-2">
+                        <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 transition-all shadow-sm">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Choose Another File</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleImageFileUpload(file, false);
+                            }}
+                          />
+                        </label>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const url = prompt('Enter or paste image web URL:', formImage.startsWith('data:') ? '' : formImage);
+                            if (url !== null && url.trim()) setFormImage(url.trim());
+                          }}
+                          className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-[11px] font-semibold cursor-pointer border border-slate-800 transition-colors"
+                        >
+                          Change to URL
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                ) : (
+                  <label className="border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-950/80 hover:bg-slate-900/90 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all group">
+                    <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
+                      <Upload className="w-6 h-6" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors block">
+                        Upload image directly from your computer
+                      </span>
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Click to browse JPG, PNG, WEBP from your PC
+                      </p>
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageFileUpload(file, false);
+                      }}
+                    />
+                  </label>
+                )}
+
+                {/* Secondary optional angle photo */}
+                <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500">Need a 2nd angle image?</span>
+                  <label className="text-blue-400 hover:text-blue-300 font-semibold cursor-pointer inline-flex items-center gap-1">
+                    <Upload className="w-3 h-3" />
+                    <span>{formSecondaryImage ? 'Replace 2nd Angle Photo' : '+ Upload 2nd Angle Photo'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageFileUpload(file, true);
+                      }}
+                    />
+                  </label>
                 </div>
               </div>
 
