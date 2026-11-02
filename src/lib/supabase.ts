@@ -8,6 +8,9 @@ export interface SupabaseConfig {
 
 const STORAGE_KEY = 'kiuix_supabase_config';
 
+export const DEFAULT_SUPABASE_URL = 'https://hidbsajhyalqnyfbqplf.supabase.co';
+export const DEFAULT_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpZGJzYWpoeWFscW55ZmJxcGxmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM1OTc0NjUsImV4cCI6MjEwOTE3MzQ2NX0.BSamCfNcEskzUlpWSaMQQxehF8wkCrLv1NDqZKshNAs';
+
 export function getSupabaseConfig(): SupabaseConfig {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -20,8 +23,8 @@ export function getSupabaseConfig(): SupabaseConfig {
   }
 
   return {
-    url: import.meta.env.VITE_SUPABASE_URL || '',
-    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+    url: import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL,
+    anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY,
   };
 }
 
