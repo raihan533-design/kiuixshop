@@ -331,6 +331,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     showToast('Catalog exported to Excel / CSV file successfully!');
   };
 
+  // Export catalog as JSON backup
+  const handleExportJSON = () => {
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(products, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute('href', dataStr);
+    dlAnchorElem.setAttribute('download', `kiuix_products_${new Date().toISOString().slice(0, 10)}.json`);
+    dlAnchorElem.click();
+    showToast('Catalog exported as JSON backup!');
+  };
+
+  // Import catalog from JSON backup
+  const handleImportJSON = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target?.result as string);
+        if (Array.isArray(imported)) {
+          imported.forEach((p: Product) => onAddProduct(p));
+          showToast(`Imported ${imported.length} products successfully!`);
+        } else {
+          alert('Invalid catalog JSON format.');
+        }
+      } catch {
+        alert('Could not parse JSON file.');
+      }
+    };
+    reader.readAsText(file);
+  };
+
   // Handle adding new custom category from Category Manager
   const handleCreateCategory = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -713,6 +742,33 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 <Download className="w-4 h-4 text-emerald-400" />
                 <span>Export Excel</span>
               </button>
+
+              {/* Backup & Sync Buttons */}
+              <button
+                onClick={handleExportJSON}
+                title="Download backup file of all added products to transfer to Chrome or Mobile"
+                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Download className="w-4 h-4 text-blue-400" />
+                <span>Backup JSON</span>
+              </button>
+
+              <label
+                title="Import products from backup file into this browser"
+                className="px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Upload className="w-4 h-4 text-blue-400" />
+                <span>Import JSON</span>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleImportJSON(file);
+                  }}
+                />
+              </label>
 
               {/* Printdoors POD Integration CTA */}
               <button
