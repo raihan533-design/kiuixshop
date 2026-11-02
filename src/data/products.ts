@@ -24,6 +24,13 @@ export const PRODUCTS: Product[] = [
     badge: 'BEST SELLER',
     image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
     secondaryImage: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&auto=format&fit=crop&q=80',
+    images: [
+      'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1484704849700-f032a568e944?w=800&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?w=800&auto=format&fit=crop&q=80'
+    ],
     description: 'Experience pure sonic isolation with the KIUIX Pulse Pro. Featuring custom 40mm beryllium drivers, active hybrid noise cancellation up to 42dB, ultra-soft protein leather ear cushions, and up to 55 hours of playback on a single charge.',
     features: [
       '42dB Hybrid Active Noise Cancellation with Transparency Mode',
@@ -40,9 +47,9 @@ export const PRODUCTS: Product[] = [
       'Weight': '248g'
     },
     colors: [
-      { name: 'Obsidian Black', hex: '#0a0a0c', inStock: true },
-      { name: 'Cobalt Blue', hex: '#1d39f5', inStock: true },
-      { name: 'Arctic White', hex: '#f8fafc', inStock: true }
+      { name: 'Obsidian Black', hex: '#0a0a0c', inStock: true, image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80' },
+      { name: 'Cobalt Blue', hex: '#1d39f5', inStock: true, image: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=800&auto=format&fit=crop&q=80' },
+      { name: 'Arctic White', hex: '#f8fafc', inStock: true, image: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&auto=format&fit=crop&q=80' }
     ],
     inStock: true,
     stockCount: 24

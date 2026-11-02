@@ -4,6 +4,13 @@ export interface CategoryItem {
   isCustom?: boolean;
 }
 
+export interface ProductColor {
+  name: string;
+  hex: string;
+  inStock: boolean;
+  image?: string; // Linked image for this color variant
+}
+
 export interface Product {
   id: string;
   name: string;
@@ -17,10 +24,11 @@ export interface Product {
   badge?: 'BEST SELLER' | 'NEW' | 'FEATURED' | 'HOT DEAL';
   image: string;
   secondaryImage?: string;
+  images?: string[]; // Gallery of up to 5+ images for slider
   description: string;
   features: string[];
   specs: Record<string, string>;
-  colors: { name: string; hex: string; inStock: boolean }[];
+  colors: ProductColor[];
   inStock: boolean;
   stockCount: number;
 }

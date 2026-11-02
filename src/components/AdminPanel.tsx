@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Product, Currency, CategoryItem } from '../types';
+import { Product, Currency, CategoryItem, ProductColor } from '../types';
 import { CURRENCIES, PRODUCTS as DEFAULT_PRODUCTS, DEFAULT_CATEGORIES } from '../data/products';
 import { Logo } from './Logo';
 import { 
@@ -25,7 +25,12 @@ import {
   FolderPlus,
   Printer,
   Upload,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Palette,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  Link as LinkIcon
 } from 'lucide-react';
 import { PrintdoorsModal } from './PrintdoorsModal';
 
@@ -77,9 +82,23 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [formCategoryLabel, setFormCategoryLabel] = useState<string>('Audio & Sound');
   const [formImage, setFormImage] = useState('');
   const [formSecondaryImage, setFormSecondaryImage] = useState('');
+  const [formImages, setFormImages] = useState<string[]>([]);
+  const [formColors, setFormColors] = useState<ProductColor[]>([]);
   const [formDescription, setFormDescription] = useState('');
   const [formBadge, setFormBadge] = useState<string>('NONE');
   const [formFeatures, setFormFeatures] = useState<string>('');
+
+  // Popular quick-add color presets
+  const POPULAR_COLOR_PRESETS = [
+    { name: 'Obsidian Black', hex: '#0a0a0c' },
+    { name: 'Cobalt Blue', hex: '#1d39f5' },
+    { name: 'Arctic White', hex: '#f8fafc' },
+    { name: 'Space Gray', hex: '#475569' },
+    { name: 'Desert Gold', hex: '#d4af37' },
+    { name: 'Emerald Green', hex: '#10b981' },
+    { name: 'Crimson Red', hex: '#dc2626' },
+    { name: 'Silver Matte', hex: '#cbd5e1' },
+  ];
 
   // Category & Section Manager Modal state
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
@@ -101,62 +120,153 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setSuccessToast(null), 3000);
   };
 
-  // Direct file upload from user's computer with auto-resizing & optimization
-  const handleImageFileUpload = (file: File, isSecondary: boolean = false) => {
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file (JPG, PNG, WEBP, GIF, etc.)');
-      return;
-    }
+  // Process and optimize computer image files for HD crispness + storage safety
+  const processImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('Invalid image file'));
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const rawDataUrl = e.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          const maxDim = 1200;
+          let width = img.width;
+          let height = img.height;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+            resolve(canvas.toDataURL(mimeType, 0.88));
+          } else {
+            resolve(rawDataUrl);
+          }
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = rawDataUrl;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const rawDataUrl = e.target?.result as string;
-      const img = new Image();
-      img.onload = () => {
-        // Optimize to max 1200px to maintain HD crispness while fitting within browser localStorage
-        const maxDim = 1200;
-        let width = img.width;
-        let height = img.height;
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
+  // Upload to a specific slot (0..4)
+  const handleSlotImageUpload = async (file: File, slotIndex: number) => {
+    try {
+      const optimized = await processImageFile(file);
+      setFormImages((prev) => {
+        const next = [...prev];
+        next[slotIndex] = optimized;
+        return next;
+      });
+      if (slotIndex === 0) setFormImage(optimized);
+      if (slotIndex === 1) setFormSecondaryImage(optimized);
+      showToast(`Image #${slotIndex + 1} loaded from computer!`);
+    } catch {
+      alert('Could not process image.');
+    }
+  };
+
+  // Batch upload multiple images from computer at once
+  const handleBatchImageUpload = async (files: FileList) => {
+    const fileArray = Array.from(files);
+    const newImages = [...formImages];
+    for (const file of fileArray) {
+      if (newImages.length < 5) {
+        try {
+          const opt = await processImageFile(file);
+          newImages.push(opt);
+        } catch {
+          // ignore invalid
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const mimeType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-          const optimized = canvas.toDataURL(mimeType, 0.88);
-          if (isSecondary) {
-            setFormSecondaryImage(optimized);
-            showToast('Secondary image uploaded from computer!');
-          } else {
-            setFormImage(optimized);
-            showToast('Main product image uploaded from computer!');
-          }
+      }
+    }
+    const finalImgs = newImages.slice(0, 5);
+    setFormImages(finalImgs);
+    if (finalImgs[0]) setFormImage(finalImgs[0]);
+    if (finalImgs[1]) setFormSecondaryImage(finalImgs[1]);
+    showToast(`${fileArray.length} photos loaded from computer into gallery!`);
+  };
+
+  // Remove slot image
+  const handleRemoveSlotImage = (slotIndex: number) => {
+    setFormImages((prev) => {
+      const next = prev.filter((_, i) => i !== slotIndex);
+      if (next[0]) setFormImage(next[0]);
+      else setFormImage('');
+      if (next[1]) setFormSecondaryImage(next[1]);
+      else setFormSecondaryImage('');
+      return next;
+    });
+    showToast(`Image #${slotIndex + 1} removed.`);
+  };
+
+  // Direct file upload fallback
+  const handleImageFileUpload = (file: File, isSecondary: boolean = false) => {
+    processImageFile(file)
+      .then((opt) => {
+        if (isSecondary) {
+          setFormSecondaryImage(opt);
+          setFormImages((prev) => {
+            const next = [...prev];
+            next[1] = opt;
+            return next;
+          });
         } else {
-          if (isSecondary) {
-            setFormSecondaryImage(rawDataUrl);
-          } else {
-            setFormImage(rawDataUrl);
-          }
-          showToast('Image uploaded from computer!');
+          setFormImage(opt);
+          setFormImages((prev) => {
+            const next = [...prev];
+            next[0] = opt;
+            return next;
+          });
         }
-      };
-      img.onerror = () => {
-        alert('Could not read image file. Please try another image.');
-      };
-      img.src = rawDataUrl;
-    };
-    reader.readAsDataURL(file);
+        showToast('Photo uploaded from computer!');
+      })
+      .catch(() => alert('Could not read image file.'));
+  };
+
+  // Color variant management
+  const handleAddColor = (preset?: { name: string; hex: string }) => {
+    const newColor: ProductColor = preset
+      ? { name: preset.name, hex: preset.hex, inStock: true, image: formImages[0] || formImage }
+      : { name: `Color ${formColors.length + 1}`, hex: '#1d39f5', inStock: true, image: formImages[0] || formImage };
+    setFormColors((prev) => [...prev, newColor]);
+    showToast(`Color "${newColor.name}" added!`);
+  };
+
+  const handleUpdateColor = (index: number, updates: Partial<ProductColor>) => {
+    setFormColors((prev) => prev.map((c, i) => (i === index ? { ...c, ...updates } : c)));
+  };
+
+  const handleRemoveColor = (index: number) => {
+    setFormColors((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleColorImageUpload = async (file: File, colorIndex: number) => {
+    try {
+      const opt = await processImageFile(file);
+      setFormColors((prev) =>
+        prev.map((c, i) => (i === colorIndex ? { ...c, image: opt } : c))
+      );
+      setFormImages((prev) => (prev.length < 5 && !prev.includes(opt) ? [...prev, opt] : prev));
+      showToast(`Custom photo linked to "${formColors[colorIndex]?.name || 'color'}"!`);
+    } catch {
+      alert('Could not process color image.');
+    }
   };
 
   // Metric stats
@@ -277,8 +387,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormStock(product.stockCount);
     setFormCategory(product.category);
     setFormCategoryLabel(product.categoryLabel);
-    setFormImage(product.image);
-    setFormSecondaryImage(product.secondaryImage || '');
+    
+    // Load up to 5 gallery images
+    const initialImages = (product.images && product.images.length > 0)
+      ? product.images.slice(0, 5)
+      : [product.image, product.secondaryImage].filter(Boolean) as string[];
+    setFormImages(initialImages);
+    setFormImage(initialImages[0] || product.image);
+    setFormSecondaryImage(initialImages[1] || product.secondaryImage || '');
+
+    // Load colors with image mappings
+    setFormColors(
+      product.colors && product.colors.length > 0
+        ? product.colors.map((c) => ({
+            ...c,
+            image: c.image || initialImages[0] || product.image
+          }))
+        : [
+            { name: 'Obsidian Black', hex: '#0a0a0c', inStock: true, image: initialImages[0] || product.image },
+            { name: 'Cobalt Blue', hex: '#1d39f5', inStock: true, image: initialImages[1] || initialImages[0] || product.image },
+            { name: 'Arctic White', hex: '#f8fafc', inStock: true, image: initialImages[0] || product.image }
+          ]
+    );
+
     setFormDescription(product.description);
     setFormBadge(product.badge || 'NONE');
     setFormFeatures(product.features.join('\n'));
@@ -305,8 +436,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setIsCreatingNewCategoryInline(true);
     }
     setInlineCatLabel('');
+    setFormImages([]);
     setFormImage('');
     setFormSecondaryImage('');
+    setFormColors([
+      { name: 'Obsidian Black', hex: '#0a0a0c', inStock: true },
+      { name: 'Cobalt Blue', hex: '#1d39f5', inStock: true },
+      { name: 'Arctic White', hex: '#f8fafc', inStock: true }
+    ]);
     setFormDescription('High-end precision crafted hardware engineered for modern workflows.');
     setFormBadge('NEW');
     setFormFeatures('Premium aerospace-grade aluminum alloy\nUltra-long battery life with fast charge\nUniversal compatibility');
@@ -317,8 +454,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formImage.trim()) {
-      alert('Please upload an image from your computer for this product before saving!');
+    const finalImages = formImages.filter((img) => img && img.trim().length > 0).slice(0, 5);
+    const mainCover = finalImages[0] || formImage.trim();
+
+    if (!mainCover) {
+      alert('Please upload at least 1 image from your computer for this product before saving!');
       return;
     }
 
@@ -338,19 +478,21 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       category: formCategory,
       categoryLabel: formCategoryLabel,
       badge: formBadge === 'NONE' ? undefined : (formBadge as any),
-      image: formImage.trim() || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
-      secondaryImage: formSecondaryImage.trim() || undefined,
+      image: mainCover,
+      secondaryImage: finalImages[1] || formSecondaryImage.trim() || undefined,
+      images: finalImages.length > 0 ? finalImages : [mainCover],
       description: formDescription,
       features: featuresArray.length > 0 ? featuresArray : ['Precision build', 'High durability'],
       specs: editingProduct?.specs || {
         'Build Material': 'Aerospace Anodized Aluminum',
         'Warranty': '2-Year Official KIUIX Warranty',
       },
-      colors: editingProduct?.colors || [
-        { name: 'Obsidian Black', hex: '#0a0a0c', inStock: true },
-        { name: 'Cobalt Blue', hex: '#1d39f5', inStock: true },
-        { name: 'Arctic White', hex: '#f8fafc', inStock: true },
-      ],
+      colors: formColors.length > 0
+        ? formColors.map((c) => ({
+            ...c,
+            image: c.image || mainCover
+          }))
+        : [{ name: 'Standard', hex: '#1d39f5', inStock: true, image: mainCover }],
       inStock: Number(formStock) > 0,
       stockCount: Number(formStock),
     };
@@ -1004,113 +1146,279 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
               </div>
 
-              {/* Product Main Image (Upload from Computer) */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-bold text-slate-300">
-                    Product Main Image
+              {/* Product 5-Image Gallery (Upload from Computer) */}
+              <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-blue-400" />
+                      <span>Product Image Gallery (Up to 5 Photos for Slider)</span>
+                    </label>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Customers can slide through these 5 images on storefront and quick view. Image #1 is the store cover.
+                    </p>
+                  </div>
+
+                  {/* Batch Upload Button */}
+                  <label className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/40 text-blue-300 rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 transition-all self-start sm:self-auto">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload Multiple from PC</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        if (e.target.files) handleBatchImageUpload(e.target.files);
+                      }}
+                    />
                   </label>
-                  {formImage && (
-                    <button
-                      type="button"
-                      onClick={() => setFormImage('')}
-                      className="text-[11px] text-rose-400 hover:text-rose-300 cursor-pointer flex items-center gap-1 font-semibold"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      <span>Remove Photo</span>
-                    </button>
-                  )}
                 </div>
 
-                {formImage ? (
-                  <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-3 flex items-center gap-4 shadow-inner">
-                    <img
-                      src={formImage}
-                      alt="Uploaded preview"
-                      className="w-20 h-20 rounded-xl object-cover bg-slate-900 border border-slate-700 shadow-md flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                          <Check className="w-3 h-3" /> Image Selected
-                        </span>
-                        {formImage.startsWith('data:') && (
-                          <span className="text-[10px] text-blue-400 font-mono">From Computer</span>
+                {/* 5 Slots Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {[0, 1, 2, 3, 4].map((slotIdx) => {
+                    const slotImg = formImages[slotIdx];
+                    const isCover = slotIdx === 0;
+
+                    return (
+                      <div
+                        key={slotIdx}
+                        className={`relative aspect-square rounded-2xl border transition-all overflow-hidden flex flex-col justify-between ${
+                          slotImg
+                            ? 'border-slate-700 bg-slate-900 group shadow-md'
+                            : 'border-dashed border-slate-800 hover:border-blue-500 bg-slate-900/50'
+                        }`}
+                      >
+                        {slotImg ? (
+                          <>
+                            <img
+                              src={slotImg}
+                              alt={`Slot ${slotIdx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Slot Badge */}
+                            <div className="absolute top-1.5 left-1.5 z-10">
+                              <span
+                                className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm ${
+                                  isCover
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-slate-950/80 text-slate-300 backdrop-blur-xs'
+                                }`}
+                              >
+                                {isCover ? '#1 Cover' : `#${slotIdx + 1}`}
+                              </span>
+                            </div>
+
+                            {/* Hover Actions */}
+                            <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1.5 p-2">
+                              <label className="w-full py-1 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-bold rounded-lg cursor-pointer flex items-center justify-center gap-1">
+                                <Upload className="w-3 h-3" />
+                                <span>Change</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleSlotImageUpload(file, slotIdx);
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSlotImage(slotIdx)}
+                                className="w-full py-1 bg-rose-600/80 hover:bg-rose-600 text-white text-[10px] font-bold rounded-lg cursor-pointer flex items-center justify-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <label className="w-full h-full flex flex-col items-center justify-center gap-1 p-2 cursor-pointer text-center group">
+                            <div className="w-8 h-8 rounded-xl bg-slate-800 group-hover:bg-blue-600/20 text-slate-400 group-hover:text-blue-400 flex items-center justify-center transition-colors">
+                              <Upload className="w-4 h-4" />
+                            </div>
+                            <span className="text-[11px] font-bold text-slate-300 group-hover:text-blue-400 transition-colors">
+                              + Photo #{slotIdx + 1}
+                            </span>
+                            <span className="text-[9px] text-slate-500">
+                              {isCover ? 'Main Cover' : 'Slide View'}
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleSlotImageUpload(file, slotIdx);
+                              }}
+                            />
+                          </label>
                         )}
                       </div>
-                      <p className="text-xs text-slate-300 font-semibold mt-1">
-                        High resolution photo ready for catalog
-                      </p>
-                      
-                      <div className="mt-2.5 flex items-center gap-2">
-                        <label className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1.5 transition-all shadow-sm">
-                          <Upload className="w-3.5 h-3.5" />
-                          <span>Choose Another File</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleImageFileUpload(file, false);
-                            }}
-                          />
-                        </label>
+                    );
+                  })}
+                </div>
+              </div>
 
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const url = prompt('Enter or paste image web URL:', formImage.startsWith('data:') ? '' : formImage);
-                            if (url !== null && url.trim()) setFormImage(url.trim());
-                          }}
-                          className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl text-[11px] font-semibold cursor-pointer border border-slate-800 transition-colors"
-                        >
-                          Change to URL
-                        </button>
-                      </div>
-                    </div>
+              {/* Product Colors & Image Mapping Section */}
+              <div className="bg-slate-950/70 p-4 rounded-2xl border border-slate-800 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-white flex items-center gap-1.5">
+                      <Palette className="w-4 h-4 text-blue-400" />
+                      <span>Product Colors & Image Mapping ({formColors.length} variants)</span>
+                    </label>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Add as many colors as you want and select which image appears for each color.
+                    </p>
                   </div>
-                ) : (
-                  <label className="border-2 border-dashed border-slate-700 hover:border-blue-500 bg-slate-950/80 hover:bg-slate-900/90 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all group">
-                    <div className="w-12 h-12 rounded-2xl bg-blue-600/20 text-blue-400 group-hover:bg-blue-600 group-hover:text-white flex items-center justify-center transition-all shadow-sm">
-                      <Upload className="w-6 h-6" />
-                    </div>
-                    <div className="text-center">
-                      <span className="text-xs font-bold text-white group-hover:text-blue-400 transition-colors block">
-                        Upload image directly from your computer
-                      </span>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Click to browse JPG, PNG, WEBP from your PC
-                      </p>
-                    </div>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageFileUpload(file, false);
-                      }}
-                    />
-                  </label>
-                )}
 
-                {/* Secondary optional angle photo */}
-                <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                  <span className="text-slate-500">Need a 2nd angle image?</span>
-                  <label className="text-blue-400 hover:text-blue-300 font-semibold cursor-pointer inline-flex items-center gap-1">
-                    <Upload className="w-3 h-3" />
-                    <span>{formSecondaryImage ? 'Replace 2nd Angle Photo' : '+ Upload 2nd Angle Photo'}</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageFileUpload(file, true);
-                      }}
-                    />
-                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleAddColor()}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold cursor-pointer inline-flex items-center gap-1 transition-all self-start sm:self-auto shadow-sm"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Custom Color</span>
+                  </button>
+                </div>
+
+                {/* Popular Presets Quick Bar */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-1">
+                    Quick Presets:
+                  </span>
+                  {POPULAR_COLOR_PRESETS.map((preset) => (
+                    <button
+                      key={preset.name}
+                      type="button"
+                      onClick={() => handleAddColor(preset)}
+                      className="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[10px] font-medium text-slate-300 flex items-center gap-1.5 transition-all cursor-pointer hover:border-slate-700"
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full border border-slate-700" style={{ backgroundColor: preset.hex }} />
+                      <span>+ {preset.name}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Colors List */}
+                <div className="space-y-2.5 pt-2">
+                  {formColors.length === 0 ? (
+                    <div className="py-4 text-center text-slate-500 text-xs border border-dashed border-slate-800 rounded-xl">
+                      No colors added yet. Click &quot;Add Custom Color&quot; or choose from quick presets above.
+                    </div>
+                  ) : (
+                    formColors.map((col, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3"
+                      >
+                        {/* Color Picker & Name */}
+                        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+                          {/* Native Color Picker swatch */}
+                          <div className="relative flex-shrink-0">
+                            <input
+                              type="color"
+                              value={col.hex.startsWith('#') ? col.hex : '#1d39f5'}
+                              onChange={(e) => handleUpdateColor(idx, { hex: e.target.value })}
+                              className="w-9 h-9 rounded-xl border border-slate-700 bg-transparent cursor-pointer p-0.5"
+                              title="Click to pick custom color"
+                            />
+                          </div>
+
+                          <input
+                            type="text"
+                            required
+                            placeholder="Color Name (e.g. Cobalt Blue)"
+                            value={col.name}
+                            onChange={(e) => handleUpdateColor(idx, { name: e.target.value })}
+                            className="flex-1 text-xs font-semibold px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder:text-slate-600 focus:outline-hidden focus:border-blue-500"
+                          />
+
+                          <input
+                            type="text"
+                            placeholder="#1d39f5"
+                            value={col.hex}
+                            onChange={(e) => handleUpdateColor(idx, { hex: e.target.value })}
+                            className="w-20 font-mono text-xs px-2.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 focus:outline-hidden focus:border-blue-500 text-center"
+                          />
+                        </div>
+
+                        {/* Mapped Image & Actions */}
+                        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap justify-between md:justify-end">
+                          {/* Image Dropdown / Linker */}
+                          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
+                            <span className="text-[11px] font-bold text-slate-400">Shows Image:</span>
+                            <select
+                              value={col.image || formImages[0] || ''}
+                              onChange={(e) => handleUpdateColor(idx, { image: e.target.value })}
+                              className="bg-slate-900 text-[11px] font-semibold text-blue-400 border border-slate-700 rounded-lg px-2 py-1 focus:outline-hidden cursor-pointer max-w-[140px]"
+                            >
+                              <option value="">Choose photo...</option>
+                              {formImages.map((img, imgIdx) => (
+                                <option key={imgIdx} value={img}>
+                                  Image #{imgIdx + 1} {imgIdx === 0 ? '(Main Cover)' : ''}
+                                </option>
+                              ))}
+                              {col.image && !formImages.includes(col.image) && (
+                                <option value={col.image}>Custom Photo</option>
+                              )}
+                            </select>
+
+                            {/* Small thumbnail of linked image */}
+                            {(col.image || formImages[0]) && (
+                              <img
+                                src={col.image || formImages[0]}
+                                alt="Color image"
+                                className="w-6 h-6 rounded-md object-cover border border-slate-700 flex-shrink-0"
+                              />
+                            )}
+
+                            {/* Upload specific photo for this color */}
+                            <label
+                              title="Upload specific photo for this color from PC"
+                              className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer transition-colors"
+                            >
+                              <Upload className="w-3.5 h-3.5 text-blue-400" />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleColorImageUpload(file, idx);
+                                }}
+                              />
+                            </label>
+                          </div>
+
+                          {/* In Stock Toggle */}
+                          <label className="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={col.inStock}
+                              onChange={(e) => handleUpdateColor(idx, { inStock: e.target.checked })}
+                              className="rounded border-slate-700 text-blue-600 focus:ring-0 cursor-pointer"
+                            />
+                            <span className="text-[11px]">In Stock</span>
+                          </label>
+
+                          {/* Delete Color */}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveColor(idx)}
+                            className="p-2 rounded-xl text-rose-400 hover:text-white hover:bg-rose-600/30 transition-colors cursor-pointer"
+                            title="Remove color variant"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
 

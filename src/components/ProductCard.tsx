@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Product, Currency } from '../types';
 import { CURRENCIES } from '../data/products';
-import { Heart, Eye, ShoppingCart, Check, Star } from 'lucide-react';
+import { Heart, Eye, ShoppingCart, Check, Star, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ProductCardProps {
   product: Product;
@@ -20,9 +20,39 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   onQuickView,
   onAddToCart,
 }) => {
+  const gallery: string[] = (product.images && product.images.length > 0)
+    ? product.images
+    : [product.image, product.secondaryImage].filter(Boolean) as string[];
+
   const [selectedColor, setSelectedColor] = useState(product.colors[0]?.name || '');
+  const [slideIndex, setSlideIndex] = useState(0);
+  const [colorMatchedImage, setColorMatchedImage] = useState<string | null>(
+    product.colors[0]?.image || null
+  );
   const [isHovered, setIsHovered] = useState(false);
   const [addedRecently, setAddedRecently] = useState(false);
+
+  const handleSelectColor = (e: React.MouseEvent, c: { name: string; hex: string; inStock: boolean; image?: string }) => {
+    e.stopPropagation();
+    setSelectedColor(c.name);
+    if (c.image) {
+      setColorMatchedImage(c.image);
+      const foundIdx = gallery.indexOf(c.image);
+      if (foundIdx !== -1) setSlideIndex(foundIdx);
+    }
+  };
+
+  const handlePrevSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setColorMatchedImage(null);
+    setSlideIndex((prev) => (prev > 0 ? prev - 1 : gallery.length - 1));
+  };
+
+  const handleNextSlide = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setColorMatchedImage(null);
+    setSlideIndex((prev) => (prev < gallery.length - 1 ? prev + 1 : 0));
+  };
 
   const handleAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -34,6 +64,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const currentRate = CURRENCIES[currentCurrency].rate;
   const currentSymbol = CURRENCIES[currentCurrency].symbol;
 
+  const currentImage = colorMatchedImage || gallery[slideIndex] || product.image;
+
   return (
     <div
       onMouseEnter={() => setIsHovered(true)}
@@ -44,11 +76,47 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       <div className="relative aspect-square w-full overflow-hidden bg-slate-50 cursor-pointer" onClick={() => onQuickView(product.id)}>
         {/* Main Product Image */}
         <img
-          src={isHovered && product.secondaryImage ? product.secondaryImage : product.image}
+          src={currentImage}
           alt={product.name}
           className="w-full h-full object-cover object-center transition-all duration-700 group-hover:scale-105"
           loading="lazy"
         />
+
+        {/* Gallery Slide Arrows on Hover */}
+        {gallery.length > 1 && (
+          <div className="absolute inset-x-2 top-1/2 -translate-y-1/2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+            <button
+              type="button"
+              onClick={handlePrevSlide}
+              className="pointer-events-auto w-7 h-7 rounded-full bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center shadow-md transition-all cursor-pointer hover:scale-110"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={handleNextSlide}
+              className="pointer-events-auto w-7 h-7 rounded-full bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center shadow-md transition-all cursor-pointer hover:scale-110"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Dot Indicators */}
+        {gallery.length > 1 && (
+          <div className="absolute bottom-2.5 inset-x-0 flex items-center justify-center gap-1 z-10">
+            {gallery.map((_, i) => (
+              <span
+                key={i}
+                className={`h-1 rounded-full transition-all ${
+                  slideIndex === i ? 'w-3.5 bg-blue-600' : 'w-1 bg-slate-400/50'
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Badge */}
         {product.badge && (
@@ -128,17 +196,17 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
           {/* Color options */}
           {product.colors && product.colors.length > 0 && (
-            <div className="flex items-center gap-1 sm:gap-1.5 mt-2 sm:mt-3">
-              <span className="text-[10px] sm:text-[11px] text-slate-400 mr-0.5 sm:mr-1 hidden sm:inline">Color:</span>
+            <div className="flex items-center gap-1.5 mt-2 sm:mt-3 flex-wrap">
+              <span className="text-[10px] sm:text-[11px] text-slate-400 mr-0.5 hidden sm:inline">Color:</span>
               {product.colors.map((c) => (
                 <button
                   key={c.name}
-                  onClick={() => setSelectedColor(c.name)}
-                  title={c.name}
-                  className={`w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border transition-all ${
+                  onClick={(e) => handleSelectColor(e, c)}
+                  title={`${c.name} ${c.image ? '(Click to view photo)' : ''}`}
+                  className={`w-4 h-4 rounded-full border transition-all cursor-pointer ${
                     selectedColor === c.name
-                      ? 'ring-2 ring-blue-600 ring-offset-1 scale-110'
-                      : 'border-slate-300 hover:scale-105'
+                      ? 'ring-2 ring-blue-600 ring-offset-1 scale-115'
+                      : 'border-slate-300 hover:scale-110'
                   }`}
                   style={{ backgroundColor: c.hex }}
                 />

@@ -110,15 +110,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
               </button>
             </div>
           ) : (
-            cart.map((item) => (
-              <div key={`${item.product.id}-${item.selectedColor}`} className="pt-3 first:pt-0 flex gap-3">
-                <img
-                  src={item.product.image}
-                  alt={item.product.name}
-                  className="w-18 h-18 rounded-xl object-cover border border-slate-200 bg-slate-50 flex-shrink-0"
-                />
+            cart.map((item) => {
+              const itemImage =
+                item.product.colors?.find((c) => c.name === item.selectedColor)?.image ||
+                item.product.image;
 
-                <div className="flex-1 flex flex-col justify-between">
+              return (
+                <div key={`${item.product.id}-${item.selectedColor}`} className="pt-3 first:pt-0 flex gap-3">
+                  <img
+                    src={itemImage}
+                    alt={item.product.name}
+                    className="w-18 h-18 rounded-xl object-cover border border-slate-200 bg-slate-50 flex-shrink-0"
+                  />
+                  <div className="flex-1 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
                     <div>
                       <h4 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-1">
@@ -163,7 +167,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                   </div>
                 </div>
               </div>
-            ))
+            );
+          })
           )}
         </div>
 

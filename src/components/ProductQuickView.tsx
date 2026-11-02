@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Product, Currency } from '../types';
 import { CURRENCIES } from '../data/products';
-import { X, Star, ShieldCheck, Check, ShoppingBag, Truck, RotateCcw } from 'lucide-react';
+import { X, Star, ShieldCheck, Check, ShoppingBag, Truck, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ProductQuickViewProps {
   product: Product | null;
@@ -20,13 +20,45 @@ export const ProductQuickView: React.FC<ProductQuickViewProps> = ({
 }) => {
   if (!product) return null;
 
-  const [activeImage, setActiveImage] = useState(product.image);
+  const gallery: string[] = (product.images && product.images.length > 0)
+    ? product.images
+    : [product.image, product.secondaryImage].filter(Boolean) as string[];
+
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
+  const [activeImage, setActiveImage] = useState(gallery[0] || product.image);
   const [selectedColor, setSelectedColor] = useState(product.colors[0]?.name || '');
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
 
   const rate = CURRENCIES[currentCurrency].rate;
   const symbol = CURRENCIES[currentCurrency].symbol;
+
+  const handleSelectColor = (colorName: string) => {
+    setSelectedColor(colorName);
+    const matched = product.colors.find((c) => c.name === colorName);
+    if (matched?.image) {
+      setActiveImage(matched.image);
+      const imgIdx = gallery.indexOf(matched.image);
+      if (imgIdx !== -1) setActiveSlideIndex(imgIdx);
+    }
+  };
+
+  const handlePrevSlide = () => {
+    const nextIdx = activeSlideIndex > 0 ? activeSlideIndex - 1 : gallery.length - 1;
+    setActiveSlideIndex(nextIdx);
+    setActiveImage(gallery[nextIdx] || product.image);
+  };
+
+  const handleNextSlide = () => {
+    const nextIdx = activeSlideIndex < gallery.length - 1 ? activeSlideIndex + 1 : 0;
+    setActiveSlideIndex(nextIdx);
+    setActiveImage(gallery[nextIdx] || product.image);
+  };
+
+  const handleSelectSlide = (idx: number) => {
+    setActiveSlideIndex(idx);
+    setActiveImage(gallery[idx] || product.image);
+  };
 
   const handleAdd = () => {
     onAddToCart(product.id, quantity, selectedColor);
@@ -40,43 +72,91 @@ export const ProductQuickView: React.FC<ProductQuickViewProps> = ({
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+          className="absolute top-4 right-4 z-20 w-10 h-10 rounded-full bg-white/90 hover:bg-slate-100 text-slate-700 flex items-center justify-center transition-colors cursor-pointer shadow-md"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="grid grid-cols-1 md:grid-cols-2 max-h-[85vh] overflow-y-auto">
-          {/* Left: Media Viewport */}
+          {/* Left: Media Viewport & 5-Image Slider */}
           <div className="p-6 bg-slate-50 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-200">
-            <div className="aspect-square rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-xs flex items-center justify-center">
-              <img
-                src={activeImage}
-                alt={product.name}
-                className="w-full h-full object-cover transition-all duration-300"
-              />
-            </div>
+            <div className="space-y-3">
+              {/* Main Slider Viewport */}
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-white border border-slate-200 shadow-sm flex items-center justify-center group">
+                <img
+                  src={activeImage}
+                  alt={product.name}
+                  className="w-full h-full object-cover transition-all duration-300"
+                />
 
-            {/* Thumbnail switcher */}
-            {product.secondaryImage && (
-              <div className="flex gap-3 mt-4">
-                <button
-                  onClick={() => setActiveImage(product.image)}
-                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                    activeImage === product.image ? 'border-blue-600 ring-2 ring-blue-600/30' : 'border-slate-200'
-                  }`}
-                >
-                  <img src={product.image} alt="Thumb 1" className="w-full h-full object-cover" />
-                </button>
-                <button
-                  onClick={() => setActiveImage(product.secondaryImage!)}
-                  className={`w-16 h-16 rounded-xl overflow-hidden border-2 transition-all ${
-                    activeImage === product.secondaryImage ? 'border-blue-600 ring-2 ring-blue-600/30' : 'border-slate-200'
-                  }`}
-                >
-                  <img src={product.secondaryImage} alt="Thumb 2" className="w-full h-full object-cover" />
-                </button>
+                {/* Slide Number Badge */}
+                {gallery.length > 1 && (
+                  <div className="absolute top-3 left-3 z-10">
+                    <span className="bg-slate-950/70 backdrop-blur-md text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      {activeSlideIndex + 1} / {gallery.length}
+                    </span>
+                  </div>
+                )}
+
+                {/* Left / Right Chevron Controls */}
+                {gallery.length > 1 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handlePrevSlide}
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center shadow-md transition-all cursor-pointer opacity-80 hover:opacity-100 hover:scale-105"
+                      aria-label="Previous image"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextSlide}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 hover:bg-white text-slate-800 flex items-center justify-center shadow-md transition-all cursor-pointer opacity-80 hover:opacity-100 hover:scale-105"
+                      aria-label="Next image"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+
+                    {/* Dot Indicators */}
+                    <div className="absolute bottom-2.5 inset-x-0 flex items-center justify-center gap-1.5 z-10">
+                      {gallery.map((_, dotIdx) => (
+                        <button
+                          key={dotIdx}
+                          type="button"
+                          onClick={() => handleSelectSlide(dotIdx)}
+                          className={`h-1.5 rounded-full transition-all cursor-pointer ${
+                            activeSlideIndex === dotIdx
+                              ? 'w-5 bg-blue-600'
+                              : 'w-1.5 bg-slate-400/60 hover:bg-slate-600'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
-            )}
+
+              {/* 5-Thumbnail Switcher Strip */}
+              {gallery.length > 1 && (
+                <div className="grid grid-cols-5 gap-2 pt-1">
+                  {gallery.map((thumbImg, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleSelectSlide(idx)}
+                      className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        activeSlideIndex === idx
+                          ? 'border-blue-600 ring-2 ring-blue-600/30 scale-102'
+                          : 'border-slate-200 hover:border-slate-300 opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <img src={thumbImg} alt={`View ${idx + 1}`} className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Guarantees */}
             <div className="mt-6 pt-4 border-t border-slate-200/80 grid grid-cols-2 gap-3 text-xs text-slate-600">
@@ -140,19 +220,22 @@ export const ProductQuickView: React.FC<ProductQuickViewProps> = ({
                   <label className="text-xs font-bold text-slate-900 block mb-2">
                     Select Finish: <span className="text-blue-600 font-semibold">{selectedColor}</span>
                   </label>
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2.5 flex-wrap">
                     {product.colors.map((c) => (
                       <button
                         key={c.name}
-                        onClick={() => setSelectedColor(c.name)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
+                        onClick={() => handleSelectColor(c.name)}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
                           selectedColor === c.name
-                            ? 'border-blue-600 bg-blue-50/70 text-blue-700 ring-1 ring-blue-600'
+                            ? 'border-blue-600 bg-blue-50/70 text-blue-700 ring-2 ring-blue-600/30 font-bold shadow-xs'
                             : 'border-slate-200 text-slate-700 hover:border-slate-300'
                         }`}
                       >
-                        <span className="w-3.5 h-3.5 rounded-full border border-slate-300" style={{ backgroundColor: c.hex }} />
+                        <span className="w-3.5 h-3.5 rounded-full border border-slate-300 shadow-inner flex-shrink-0" style={{ backgroundColor: c.hex }} />
                         <span>{c.name}</span>
+                        {c.image && (
+                          <img src={c.image} alt={c.name} className="w-4 h-4 rounded-full object-cover border border-slate-300 flex-shrink-0" />
+                        )}
                       </button>
                     ))}
                   </div>
