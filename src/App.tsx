@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Currency, CartItem, Product, CategoryItem, HeroConfig } from './types';
+import { Currency, CartItem, Product, CategoryItem, HeroConfig, CustomerOrder } from './types';
 import { PRODUCTS as INITIAL_PRODUCTS, CURRENCIES, DEFAULT_CATEGORIES } from './data/products';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
@@ -27,7 +27,10 @@ import {
   supabaseInsertProduct, 
   supabaseDeleteProduct,
   supabaseFetchHeroConfig,
-  supabaseSaveHeroConfig
+  supabaseSaveHeroConfig,
+  supabaseFetchOrders,
+  supabaseInsertOrder,
+  supabaseUpdateOrderStatus
 } from './lib/supabase';
 
 export function App() {
@@ -173,6 +176,49 @@ export function App() {
     itemsCount: number;
   } | null>(null);
 
+  // Customer Orders state with LocalStorage persistence & Supabase cloud sync
+  const [orders, setOrders] = useState<CustomerOrder[]>(() => {
+    try {
+      const saved = localStorage.getItem('kiuix_orders');
+      if (saved) return JSON.parse(saved);
+      return [
+        {
+          id: 'KIU-882914',
+          customerName: 'Marcus Vance',
+          customerEmail: 'buyer@example.com',
+          customerPhone: '+1 (555) 019-2834',
+          shippingAddress: '742 Evergreen Terrace, Springfield, OR 97477, USA',
+          totalAmount: '$189.00',
+          totalUSD: 189,
+          paymentMethod: 'Credit / Debit Card (Visa)',
+          status: 'PENDING_FULFILLMENT',
+          createdAt: new Date().toISOString(),
+          items: [
+            {
+              productId: 'kiuix-pulse-anc',
+              productName: 'KIUIX Pulse Pro Wireless ANC',
+              productImage: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80',
+              price: 189,
+              quantity: 1,
+              selectedColor: 'Obsidian Black',
+              supplierUrl: 'https://www.aliexpress.com',
+            }
+          ]
+        }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('kiuix_orders', JSON.stringify(orders));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [orders]);
+
   // Check for Stripe Checkout return (?success=true&session_id=...)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -224,6 +270,13 @@ export function App() {
       if (cfg) setHeroConfig(cfg);
     });
 
+    // Fetch live Customer Orders
+    supabaseFetchOrders().then((cloudOrders) => {
+      if (cloudOrders && cloudOrders.length > 0) {
+        setOrders(cloudOrders);
+      }
+    });
+
     // Real-time synchronization: when admin adds or changes a product or hero settings, all viewers' screens update live
     const channel = client
       .channel('public:changes')
@@ -233,6 +286,13 @@ export function App() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'site_settings' }, () => {
         supabaseFetchHeroConfig().then((cfg) => {
           if (cfg) setHeroConfig(cfg);
+        });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        supabaseFetchOrders().then((cloudOrders) => {
+          if (cloudOrders && cloudOrders.length > 0) {
+            setOrders(cloudOrders);
+          }
         });
       })
       .subscribe();
@@ -282,6 +342,74 @@ export function App() {
   const handleResetProducts = () => {
     setProducts(INITIAL_PRODUCTS);
     localStorage.removeItem('kiuix_products');
+  };
+
+  // Order Fulfillment & Status Handlers
+  const handleOrderSuccess = (details: {
+    orderId: string;
+    customerEmail: string;
+    customerName: string;
+    shippingAddress?: string;
+    customerPhone?: string;
+    totalAmount: string;
+    paymentMethod: string;
+    itemsCount: number;
+  }) => {
+    const newOrder: CustomerOrder = {
+      id: details.orderId,
+      customerName: details.customerName,
+      customerEmail: details.customerEmail,
+      customerPhone: details.customerPhone,
+      shippingAddress: details.shippingAddress || '742 Evergreen Terrace, Springfield, OR 97477, USA',
+      totalAmount: details.totalAmount,
+      totalUSD: cartTotalUSD,
+      paymentMethod: details.paymentMethod,
+      items: cart.length > 0
+        ? cart.map((item) => ({
+            productId: item.product.id,
+            productName: item.product.name,
+            productImage: item.product.image,
+            price: item.product.price,
+            quantity: item.quantity,
+            selectedColor: item.selectedColor,
+            supplierUrl: item.product.supplierUrl,
+          }))
+        : [
+            {
+              productId: products[0]?.id || 'kiuix-pulse-anc',
+              productName: products[0]?.name || 'KIUIX Product',
+              productImage: products[0]?.image || '',
+              price: products[0]?.price || 99,
+              quantity: 1,
+              selectedColor: 'Standard',
+              supplierUrl: products[0]?.supplierUrl,
+            }
+          ],
+      status: 'PENDING_FULFILLMENT',
+      createdAt: new Date().toISOString(),
+    };
+
+    setOrders((prev) => [newOrder, ...prev]);
+    supabaseInsertOrder(newOrder);
+
+    setOrderSuccessDetails({
+      orderId: details.orderId,
+      customerEmail: details.customerEmail,
+      customerName: details.customerName,
+      totalAmount: details.totalAmount,
+      paymentMethod: details.paymentMethod,
+      itemsCount: details.itemsCount,
+    });
+    setCart([]);
+  };
+
+  const handleUpdateOrderStatus = (orderId: string, status: 'PENDING_FULFILLMENT' | 'FULFILLED' | 'CANCELLED') => {
+    setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+    supabaseUpdateOrderStatus(orderId, status);
+  };
+
+  const handleDeleteOrder = (orderId: string) => {
+    setOrders((prev) => prev.filter((o) => o.id !== orderId));
   };
 
   // Sync to local storage
@@ -379,6 +507,9 @@ export function App() {
         products={products}
         categories={categories}
         currentCurrency={currentCurrency}
+        orders={orders}
+        onUpdateOrderStatus={handleUpdateOrderStatus}
+        onDeleteOrder={handleDeleteOrder}
         heroConfig={heroConfig}
         onUpdateHeroConfig={(newCfg) => {
           setHeroConfig(newCfg);
@@ -633,8 +764,7 @@ export function App() {
         onClose={() => setIsStripeCheckoutOpen(false)}
         onSuccess={(details) => {
           setIsStripeCheckoutOpen(false);
-          setOrderSuccessDetails(details);
-          setCart([]); // Clear cart after successful checkout
+          handleOrderSuccess(details);
         }}
       />
 

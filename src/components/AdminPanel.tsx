@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Product, Currency, CategoryItem, ProductColor, HeroConfig } from '../types';
+import { Product, Currency, CategoryItem, ProductColor, HeroConfig, CustomerOrder } from '../types';
 import { CURRENCIES, PRODUCTS as DEFAULT_PRODUCTS, DEFAULT_CATEGORIES } from '../data/products';
 import { Logo } from './Logo';
 import { 
@@ -32,7 +32,16 @@ import {
   Sparkles,
   Link as LinkIcon,
   Database,
-  Star
+  Star,
+  ShoppingBag,
+  ShoppingCart,
+  Copy,
+  CheckCheck,
+  MapPin,
+  User,
+  Mail,
+  Phone,
+  Inbox
 } from 'lucide-react';
 import { PrintdoorsModal } from './PrintdoorsModal';
 import { SupabaseModal } from './SupabaseModal';
@@ -42,6 +51,9 @@ interface AdminPanelProps {
   products: Product[];
   categories?: CategoryItem[];
   currentCurrency: Currency;
+  orders?: CustomerOrder[];
+  onUpdateOrderStatus?: (orderId: string, status: 'PENDING_FULFILLMENT' | 'FULFILLED' | 'CANCELLED') => void;
+  onDeleteOrder?: (orderId: string) => void;
   heroConfig?: HeroConfig;
   onUpdateHeroConfig?: (newConfig: HeroConfig) => void;
   onUpdateProduct: (updated: Product) => void;
@@ -60,6 +72,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   products,
   categories = DEFAULT_CATEGORIES,
   currentCurrency,
+  orders = [],
+  onUpdateOrderStatus,
+  onDeleteOrder,
   heroConfig,
   onUpdateHeroConfig,
   onUpdateProduct,
@@ -73,6 +88,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onLockAdmin,
   onSyncProductsFromCloud,
 }) => {
+  const [adminTab, setAdminTab] = useState<'products' | 'orders'>('products');
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   
@@ -103,6 +121,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [formDescription, setFormDescription] = useState('');
   const [formBadge, setFormBadge] = useState<string>('NONE');
   const [formFeatures, setFormFeatures] = useState<string>('');
+  const [formSupplierUrl, setFormSupplierUrl] = useState<string>('');
 
   // Popular quick-add color presets
   const POPULAR_COLOR_PRESETS = [
@@ -290,6 +309,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const lowStockCount = products.filter((p) => p.stockCount > 0 && p.stockCount < 15).length;
   const outOfStockCount = products.filter((p) => p.stockCount === 0).length;
   const totalCatalogValue = products.reduce((acc, p) => acc + p.price * p.stockCount, 0);
+  const pendingOrdersCount = orders.filter((o) => o.status === 'PENDING_FULFILLMENT').length;
+  const fulfilledOrdersCount = orders.filter((o) => o.status === 'FULFILLED').length;
 
   // Export inventory to Excel / CSV
   const handleExportCSV = () => {
@@ -458,6 +479,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormDescription(product.description);
     setFormBadge(product.badge || 'NONE');
     setFormFeatures(product.features.join('\n'));
+    setFormSupplierUrl(product.supplierUrl || '');
     setIsEditing(true);
   };
 
@@ -470,6 +492,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormPrice(99);
     setFormOriginalPrice(129);
     setFormStock(25);
+    setFormSupplierUrl('');
     const availableCustomCats = categories.filter((c) => c.id !== 'all');
     if (availableCustomCats.length > 0) {
       setFormCategory(availableCustomCats[0].id);
@@ -540,6 +563,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         : [{ name: 'Standard', hex: '#1d39f5', inStock: true, image: mainCover }],
       inStock: Number(formStock) > 0,
       stockCount: Number(formStock),
+      supplierUrl: formSupplierUrl.trim() || undefined,
     };
 
     if (isNewProduct) {
@@ -689,7 +713,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
 
+        {/* Navigation Tabs: Products Catalog vs Customer Orders */}
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-800 pb-4">
+          <button
+            type="button"
+            onClick={() => setAdminTab('products')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
+              adminTab === 'products'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25'
+                : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            <span>Products Catalog ({products.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAdminTab('orders')}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer relative ${
+              adminTab === 'orders'
+                ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/25'
+                : 'bg-slate-900 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800'
+            }`}
+          >
+            <ShoppingCart className="w-4 h-4" />
+            <span>Customer Orders & Dropshipping</span>
+            {pendingOrdersCount > 0 ? (
+              <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full ml-1 animate-pulse">
+                {pendingOrdersCount} New
+              </span>
+            ) : (
+              <span className="bg-slate-800 text-slate-400 text-[10px] font-bold px-2 py-0.5 rounded-full ml-1">
+                {orders.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Product Management Section */}
+        {adminTab === 'products' && (
         <div className="bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-xl">
           
           {/* Action Toolbar */}
@@ -914,6 +977,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </div>
                   </div>
 
+                  {/* Secret Supplier Shopping Link on Mobile */}
+                  <div className="pt-2 border-t border-slate-900">
+                    {p.supplierUrl ? (
+                      <a
+                        href={p.supplierUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                      >
+                        <ShoppingBag className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Order at Supplier ↗</span>
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openEditModal(p)}
+                        className="w-full py-1 text-slate-500 hover:text-cyan-400 text-[11px] font-medium transition-colors text-center"
+                      >
+                        + Add Supplier Shopping Link
+                      </button>
+                    )}
+                  </div>
+
                   {/* Action Buttons */}
                   <div className="flex gap-2 pt-1">
                     <button
@@ -967,6 +1053,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <th className="py-3 px-4">Category</th>
                   <th className="py-3 px-4">Price ($)</th>
                   <th className="py-3 px-4">Stock Units</th>
+                  <th className="py-3 px-4">Supplier / Shopping</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -974,7 +1061,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <tbody className="divide-y divide-slate-800/60 text-slate-300">
                 {displayProducts.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-slate-500">
+                    <td colSpan={7} className="py-12 text-center text-slate-500">
                       No products found. Click "Add Product" to create one.
                     </td>
                   </tr>
@@ -1036,6 +1123,31 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                           />
                           <span className="text-slate-500 text-[11px]">pcs</span>
                         </div>
+                      </td>
+
+                      {/* Supplier Shopping Link */}
+                      <td className="py-3 px-4">
+                        {p.supplierUrl ? (
+                          <a
+                            href={p.supplierUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold transition-all shadow-xs"
+                            title={`Open supplier: ${p.supplierUrl}`}
+                          >
+                            <ShoppingBag className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Order Supplier ↗</span>
+                          </a>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(p)}
+                            className="text-slate-500 hover:text-cyan-400 text-[11px] font-medium transition-colors cursor-pointer"
+                            title="Add secret supplier URL"
+                          >
+                            + Add Link
+                          </button>
+                        )}
                       </td>
 
                       {/* Status Badge */}
@@ -1105,6 +1217,258 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
 
         </div>
+        )}
+
+        {/* Customer Orders & Dropshipping Section */}
+        {adminTab === 'orders' && (
+          <div className="bg-slate-950 rounded-3xl border border-slate-800 overflow-hidden shadow-xl space-y-6 p-5 sm:p-7 animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <ShoppingBag className="w-5 h-5 text-cyan-400" />
+                    <span>Customer Orders & Dropshipping Fulfillment</span>
+                  </h2>
+                  <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    {orders.length} Total Orders
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  কাস্টমার প্রোডাক্ট অর্ডার করলে এখানে দেওয়া সাপ্লায়ার বাটনে ক্লিক করে সাথে সাথে AliExpress বা সাপ্লায়ারের পেজে গিয়ে অর্ডার করে দিতে পারবেন।
+                </p>
+              </div>
+
+              {pendingOrdersCount > 0 && (
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></span>
+                  <span>{pendingOrdersCount} orders waiting to be fulfilled</span>
+                </div>
+              )}
+            </div>
+
+            {orders.length === 0 ? (
+              <div className="py-16 text-center space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-500 mx-auto">
+                  <Inbox className="w-6 h-6" />
+                </div>
+                <h3 className="text-white font-bold text-sm">No Customer Orders Yet</h3>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
+                  When a customer completes a checkout on your store, their order details and dropshipping supplier links will appear here immediately.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => {
+                  const isPending = order.status === 'PENDING_FULFILLMENT';
+                  return (
+                    <div
+                      key={order.id}
+                      className={`rounded-2xl border p-5 transition-all ${
+                        isPending
+                          ? 'bg-slate-900/80 border-amber-500/30 shadow-lg shadow-amber-500/5'
+                          : 'bg-slate-900/40 border-slate-800'
+                      }`}
+                    >
+                      {/* Order Header */}
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-800/80 pb-4 mb-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <span className="font-mono font-black text-white text-sm bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+                            #{order.id}
+                          </span>
+                          <span className="text-xs text-slate-400">
+                            {new Date(order.createdAt).toLocaleString()}
+                          </span>
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                              isPending
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                            }`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                isPending ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'
+                              }`}
+                            />
+                            {isPending ? 'Pending Fulfillment' : 'Fulfilled / Dispatched'}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              onUpdateOrderStatus?.(
+                                order.id,
+                                isPending ? 'FULFILLED' : 'PENDING_FULFILLMENT'
+                              )
+                            }
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              isPending
+                                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
+                                : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{isPending ? 'Mark as Fulfilled' : 'Reopen as Pending'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (confirm(`Delete order #${order.id}?`)) {
+                                onDeleteOrder?.(order.id);
+                                showToast(`Deleted order #${order.id}`);
+                              }
+                            }}
+                            className="p-1.5 rounded-xl bg-slate-800 hover:bg-rose-900/50 text-slate-400 hover:text-rose-400 border border-slate-700 transition-colors cursor-pointer"
+                            title="Delete order"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Order Details Grid */}
+                      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                        {/* Customer Information (Left Column) */}
+                        <div className="lg:col-span-5 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-blue-400" />
+                              Customer Information
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const textToCopy = `Name: ${order.customerName}\nAddress: ${order.shippingAddress || 'N/A'}\nEmail: ${order.customerEmail}\nPhone: ${order.customerPhone || 'N/A'}`;
+                                navigator.clipboard.writeText(textToCopy);
+                                setCopiedOrderId(order.id);
+                                setTimeout(() => setCopiedOrderId(null), 2000);
+                              }}
+                              className="text-[10px] font-bold px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center gap-1 cursor-pointer transition-colors"
+                              title="Copy customer address to paste into supplier checkout"
+                            >
+                              {copiedOrderId === order.id ? (
+                                <>
+                                  <CheckCheck className="w-3 h-3 text-emerald-400" />
+                                  <span className="text-emerald-400">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-3 h-3" />
+                                  <span>Copy Address</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+
+                          <div className="space-y-1.5 text-xs">
+                            <p className="text-white font-bold">{order.customerName}</p>
+                            <p className="text-slate-400 flex items-center gap-1.5">
+                              <Mail className="w-3 h-3 text-slate-500" />
+                              {order.customerEmail}
+                            </p>
+                            {order.customerPhone && (
+                              <p className="text-slate-400 flex items-center gap-1.5">
+                                <Phone className="w-3 h-3 text-slate-500" />
+                                {order.customerPhone}
+                              </p>
+                            )}
+                            <div className="pt-1.5 border-t border-slate-800/80">
+                              <div className="text-[11px] text-slate-400 flex items-start gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="text-slate-300">Delivery Destination:</strong>
+                                  <p className="text-white font-medium mt-0.5">{order.shippingAddress || 'Standard Delivery'}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="pt-1.5 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                              <span className="text-slate-400">Payment: {order.paymentMethod}</span>
+                              <span className="font-bold text-emerald-400 font-mono text-xs">{order.totalAmount}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ordered Items & Supplier Shopping Buttons (Right Column) */}
+                        <div className="lg:col-span-7 space-y-3">
+                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                            Ordered Items & Supplier Fulfillment Links ({order.items.length})
+                          </span>
+
+                          <div className="space-y-2.5">
+                            {order.items.map((item, idx) => {
+                              const catalogProduct = products.find((p) => p.id === item.productId);
+                              const targetSupplierUrl = item.supplierUrl || catalogProduct?.supplierUrl;
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <img
+                                      src={item.productImage}
+                                      alt={item.productName}
+                                      className="w-12 h-12 rounded-xl object-cover bg-slate-900 border border-slate-800 flex-shrink-0"
+                                    />
+                                    <div>
+                                      <h4 className="text-xs font-bold text-white line-clamp-1">
+                                        {item.productName}
+                                      </h4>
+                                      <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-400">
+                                        <span>Color: <strong className="text-slate-300">{item.selectedColor}</strong></span>
+                                        <span>•</span>
+                                        <span>Qty: <strong className="text-white font-mono">{item.quantity}</strong></span>
+                                        <span>•</span>
+                                        <span className="text-emerald-400 font-mono">${item.price}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* THE SUPPLIER ACTION BUTTON */}
+                                  <div>
+                                    {targetSupplierUrl ? (
+                                      <a
+                                        href={targetSupplierUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 active:scale-95 text-white font-bold text-xs shadow-md shadow-cyan-500/25 transition-all cursor-pointer whitespace-nowrap"
+                                        title={`Go to: ${targetSupplierUrl}`}
+                                      >
+                                        <ShoppingBag className="w-4 h-4 text-cyan-200" />
+                                        <span>Go to Supplier & Order Product ↗</span>
+                                      </a>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (catalogProduct) {
+                                            openEditModal(catalogProduct);
+                                          } else {
+                                            alert('Product not found in current catalog.');
+                                          }
+                                        }}
+                                        className="text-xs text-amber-400 bg-amber-950/40 hover:bg-amber-950/80 border border-amber-800/40 px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer transition-colors"
+                                      >
+                                        <span>+ Add Supplier Link</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
       </main>
 
@@ -1575,6 +1939,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   placeholder="Feature 1&#10;Feature 2&#10;Feature 3"
                   className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white focus:outline-hidden focus:border-blue-500 resize-none font-mono"
                 />
+              </div>
+
+              {/* Secret Supplier / Dropshipping Shopping Link */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/40 via-cyan-950/30 to-slate-950 border border-cyan-500/30 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                      <ShoppingBag className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-white flex items-center gap-2">
+                        <span>🔒 Secret Supplier / Shopping Link (Private)</span>
+                        <span className="text-[10px] font-black uppercase tracking-wider bg-cyan-500/20 text-cyan-400 px-1.5 py-0.2 rounded border border-cyan-500/30">
+                          Admin Only
+                        </span>
+                      </label>
+                      <p className="text-[10px] text-cyan-300/80 mt-0.5">
+                        গ্রাহকরা এই লিংক দেখতে পাবে না। কাস্টমার এই প্রোডাক্ট অর্ডার করলে আপনি সরাসরি এই লিংকে গিয়ে অর্ডার করে দেবেন।
+                      </p>
+                    </div>
+                  </div>
+                  {formSupplierUrl && (
+                    <a
+                      href={formSupplierUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 bg-cyan-950/60 px-2.5 py-1 rounded-lg border border-cyan-500/40 transition-colors"
+                    >
+                      <ExternalLink className="w-3 h-3" />
+                      <span>Test Link ↗</span>
+                    </a>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={formSupplierUrl}
+                    onChange={(e) => setFormSupplierUrl(e.target.value)}
+                    placeholder="https://aliexpress.com/item/... or https://cjdropshipping.com/... or https://amazon.com/..."
+                    className="w-full text-xs font-medium px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-hidden focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 font-mono"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-400">
+                  Tip: Paste the AliExpress, CJ Dropshipping, Amazon, Printdoors, or manufacturer item URL here.
+                </p>
               </div>
 
               {/* Action Buttons */}

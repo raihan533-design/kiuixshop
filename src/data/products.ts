@@ -52,7 +52,8 @@ export const PRODUCTS: Product[] = [
       { name: 'Arctic White', hex: '#f8fafc', inStock: true, image: 'https://images.unsplash.com/photo-1583394838336-acd977736f90?w=800&auto=format&fit=crop&q=80' }
     ],
     inStock: true,
-    stockCount: 24
+    stockCount: 24,
+    supplierUrl: 'https://www.aliexpress.com'
   },
   {
     id: 'kiuix-magflow-dock',

@@ -14,6 +14,8 @@ interface StripeCheckoutModalProps {
     orderId: string;
     customerEmail: string;
     customerName: string;
+    shippingAddress?: string;
+    customerPhone?: string;
     totalAmount: string;
     paymentMethod: string;
     itemsCount: number;
@@ -36,6 +38,8 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
   const [selectedBank, setSelectedBank] = useState<'ach' | 'ideal' | 'sepa'>('ach');
 
   const [email, setEmail] = useState('buyer@example.com');
+  const [shippingAddress, setShippingAddress] = useState('742 Evergreen Terrace, Springfield, OR 97477, USA');
+  const [customerPhone, setCustomerPhone] = useState('+1 (555) 019-2834');
   const [cardName, setCardName] = useState('Marcus Vance');
   const [cardNumber, setCardNumber] = useState('4242 •••• •••• 4242');
   const [cardExpiry, setCardExpiry] = useState('12/28');
@@ -90,6 +94,8 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
         orderId,
         customerEmail: email,
         customerName: cardName,
+        shippingAddress,
+        customerPhone,
         totalAmount: formattedTotal,
         paymentMethod: getPaymentMethodLabel(),
         itemsCount: itemCount,
@@ -236,6 +242,30 @@ export const StripeCheckoutModal: React.FC<StripeCheckoutModalProps> = ({
                 className="w-full text-xs font-medium px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
                 placeholder="buyer@gmail.com"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Shipping Destination / Address</label>
+                <input
+                  type="text"
+                  required
+                  value={shippingAddress}
+                  onChange={(e) => setShippingAddress(e.target.value)}
+                  className="w-full text-xs font-medium px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
+                  placeholder="Street, City, Postal, Country"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Contact Phone</label>
+                <input
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  className="w-full text-xs font-medium px-3 py-2 rounded-xl border border-slate-200 focus:outline-hidden focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition-all"
+                  placeholder="+1 (555) 000-0000"
+                />
+              </div>
             </div>
 
             {/* TAB 1: Credit / Debit Cards */}

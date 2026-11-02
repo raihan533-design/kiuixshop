@@ -31,6 +31,31 @@ export interface Product {
   colors: ProductColor[];
   inStock: boolean;
   stockCount: number;
+  supplierUrl?: string; // Private supplier/dropshipping shopping link (admin only)
+}
+
+export interface OrderItem {
+  productId: string;
+  productName: string;
+  productImage: string;
+  price: number;
+  quantity: number;
+  selectedColor: string;
+  supplierUrl?: string;
+}
+
+export interface CustomerOrder {
+  id: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  shippingAddress?: string;
+  totalAmount: string;
+  totalUSD: number;
+  paymentMethod: string;
+  items: OrderItem[];
+  status: 'PENDING_FULFILLMENT' | 'FULFILLED' | 'CANCELLED';
+  createdAt: string;
 }
 
 export interface CartItem {

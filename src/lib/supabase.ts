@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { Product } from '../types';
+import { Product, CustomerOrder } from '../types';
 
 export interface SupabaseConfig {
   url: string;
@@ -77,6 +77,7 @@ export function productToRow(p: Product) {
     colors: p.colors,
     in_stock: p.inStock,
     stock_count: p.stockCount,
+    supplier_url: p.supplierUrl ?? null,
   };
 }
 
@@ -102,6 +103,7 @@ export function rowToProduct(row: any): Product {
     colors: Array.isArray(row.colors) ? row.colors : [],
     inStock: Boolean(row.in_stock),
     stockCount: Number(row.stock_count || 0),
+    supplierUrl: row.supplier_url || undefined,
   };
 }
 
@@ -166,8 +168,67 @@ export async function supabaseSaveHeroConfig(config: any) {
   }
 }
 
+// Orders cloud helpers
+export async function supabaseFetchOrders(): Promise<CustomerOrder[]> {
+  const client = getSupabaseClient();
+  if (!client) return [];
+  try {
+    const { data, error } = await (client.from('orders') as any).select('*').order('created_at', { ascending: false });
+    if (!error && Array.isArray(data)) {
+      return data.map((row: any) => ({
+        id: row.id,
+        customerName: row.customer_name,
+        customerEmail: row.customer_email,
+        customerPhone: row.customer_phone || undefined,
+        shippingAddress: row.shipping_address || undefined,
+        totalAmount: row.total_amount,
+        totalUSD: Number(row.total_usd),
+        paymentMethod: row.payment_method,
+        items: Array.isArray(row.items) ? row.items : [],
+        status: row.status || 'PENDING_FULFILLMENT',
+        createdAt: row.created_at,
+      }));
+    }
+  } catch (e) {
+    console.warn('Supabase fetch orders skipped:', e);
+  }
+  return [];
+}
+
+export async function supabaseInsertOrder(order: CustomerOrder) {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    await (client.from('orders') as any).insert({
+      id: order.id,
+      customer_name: order.customerName,
+      customer_email: order.customerEmail,
+      customer_phone: order.customerPhone || null,
+      shipping_address: order.shippingAddress || null,
+      total_amount: order.totalAmount,
+      total_usd: order.totalUSD,
+      payment_method: order.paymentMethod,
+      items: order.items,
+      status: order.status,
+      created_at: order.createdAt,
+    });
+  } catch (e) {
+    console.warn('Supabase insert order error:', e);
+  }
+}
+
+export async function supabaseUpdateOrderStatus(id: string, status: string) {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    await (client.from('orders') as any).update({ status }).eq('id', id);
+  } catch (e) {
+    console.warn('Supabase update order error:', e);
+  }
+}
+
 // SQL schema generator for Supabase SQL Editor
-export const SUPABASE_SQL_SCHEMA = `-- 1. Create products table
+export const SUPABASE_SQL_SCHEMA = `-- 1. Create products table (with private supplier link)
 create table if not exists public.products (
   id text primary key,
   name text not null,
@@ -188,6 +249,7 @@ create table if not exists public.products (
   colors jsonb default '[]'::jsonb,
   in_stock boolean default true,
   stock_count integer default 10,
+  supplier_url text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -221,4 +283,30 @@ create policy "Allow public read settings" on public.site_settings for select us
 
 drop policy if exists "Allow public write settings" on public.site_settings;
 create policy "Allow public write settings" on public.site_settings for all using (true) with check (true);
+
+-- 5. Create orders table (Customer orders & dropshipping fulfillment)
+create table if not exists public.orders (
+  id text primary key,
+  customer_name text not null,
+  customer_email text not null,
+  customer_phone text,
+  shipping_address text,
+  total_amount text not null,
+  total_usd numeric not null,
+  payment_method text not null,
+  items jsonb not null default '[]'::jsonb,
+  status text not null default 'PENDING_FULFILLMENT',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.orders enable row level security;
+
+drop policy if exists "Allow public read orders" on public.orders;
+create policy "Allow public read orders" on public.orders for select using (true);
+
+drop policy if exists "Allow public insert orders" on public.orders;
+create policy "Allow public insert orders" on public.orders for insert with check (true);
+
+drop policy if exists "Allow public update orders" on public.orders;
+create policy "Allow public update orders" on public.orders for update using (true);
 `;
